@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <limits.h> // 为了使用 PATH_MAX
+#include <time.h>
 
 // --- 配置区 ---
 const uid_t PROTECTED_UID_GE = 1000;
@@ -20,6 +21,40 @@ const char *EXCLUDE_PATTERNS[] = {
     "/bin/",
     NULL
 };
+
+// 获取日志文件路径
+const char* get_log_path(void) {
+    const char* log_path = getenv("ZCO_TRASH_LOG");
+    if (log_path && strlen(log_path) > 0) {
+        return log_path;
+    }
+    static char default_path[PATH_MAX];
+    const char* home = getenv("HOME");
+    if (home) {
+        snprintf(default_path, sizeof(default_path), "%s/.zco-trash-log", home);
+    } else {
+        snprintf(default_path, sizeof(default_path), "/tmp/.zco-trash-log");
+    }
+    return default_path;
+}
+
+// 记录日志
+void log_trash_failure(const char* pathname, int ret) {
+    const char* log_path = get_log_path();
+    FILE* fp = fopen(log_path, "a");
+    if (!fp) return;
+
+    time_t now = time(NULL);
+    struct tm* tm_info = localtime(&now);
+    char time_str[64];
+    strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", tm_info);
+
+    char cwd[PATH_MAX];
+    const char* current_dir = getcwd(cwd, sizeof(cwd)) ? cwd : "unknown";
+
+    fprintf(fp, "[%s] PWD: %s , DEST: %s , RET: %d\n", time_str, current_dir, pathname, ret);
+    fclose(fp);
+}
 
 // 核心判断逻辑
 int should_intercept(const char *pathname) {
@@ -57,10 +92,10 @@ int should_intercept(const char *pathname) {
 
 int do_trash(const char *pathname) {
     char command[2048];
-    // 使用双引号包裹路径以支持带空格的文件名
-    snprintf(command, sizeof(command), "/usr/bin/trash-put \"%s\" > /dev/null 2>&1", pathname);
+    // 使用单引号包裹路径以支持带空格和特殊字符的文件名
+    snprintf(command, sizeof(command), "/usr/bin/trash-put '%s' > /dev/null 2>&1", pathname);
     int ret = system(command);
-    return (ret == 0) ? 0 : -1;
+    return ret;
 }
 
 // 拦截 unlink
@@ -70,6 +105,8 @@ int unlink(const char *pathname) {
         int ret = do_trash(pathname);
         if (ret == 0) {
             return ret;
+        } else {
+            log_trash_failure(pathname, ret);
         }
     }
     return original_unlink(pathname);
@@ -86,6 +123,8 @@ int unlinkat(int dirfd, const char *pathname, int flags) {
         int ret = do_trash(pathname);
         if (ret == 0) {
             return ret;
+        } else {
+            log_trash_failure(pathname, ret);
         }
     }
 

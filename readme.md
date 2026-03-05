@@ -175,8 +175,11 @@ trash-list
 
 - **查看回收站**：使用 `trash-list` 指令。
 - **恢复文件**：使用 `trash-restore` 指令（按索引号交互恢复）。
-- **风险边界**：本方案属于“应用层劫持”。对于静态编译（Static Link）或直接使用原始系统调用的二进制程序无效，但在 VS Code 这种基于 Node.js/Glibc 的环境下具有极高的防御效力。
+- **风险边界**：本方案属于”应用层劫持”。对于静态编译（Static Link）或直接使用原始系统调用的二进制程序无效，但在 VS Code 这种基于 Node.js/Glibc 的环境下具有极高的防御效力。
 - **更多参考**：
   - [trash-cli 官方文档](https://github.com/andreafrancia/trash-cli)
   - [LD_PRELOAD 技术详解](https://man7.org/linux/man-pages/man8/ld.so.8.html)
+
 ---
+
+## 📄 License: MIT License

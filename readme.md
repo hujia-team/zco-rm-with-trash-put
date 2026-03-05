@@ -40,7 +40,125 @@
 
 ---
 
-### 5. 部署路径
+## 📦 依赖说明
+
+### 系统依赖
+- **操作系统**：Linux (Ubuntu/Debian 系列)
+- **编译器**：gcc (支持 C99 标准)
+- **动态链接库**：libdl (通常系统自带)
+
+### 软件依赖
+- **trash-cli**：回收站管理工具
+  - 安装命令：`sudo apt update && sudo apt install trash-cli`
+  - 验证安装：`trash-put --version`
+
+---
+
+## 🚀 安装说明
+
+### 方式一：自动安装（推荐）
+
+使用 Makefile 一键安装到 zsh 环境：
+
+```bash
+make install-zshrc
+```
+
+该命令会自动完成以下操作：
+1. 检查并安装 trash-cli 依赖
+2. 编译生成 `libtrash_intercept_v2.so`
+3. 将库文件复制到 `~/.local/lib/zco/`
+4. 自动配置 `~/.zshrc` 添加 `LD_PRELOAD` 环境变量
+
+安装完成后，执行以下命令使配置立即生效：
+```bash
+export LD_PRELOAD=~/.local/lib/zco/libtrash_intercept_v2.so
+```
+
+或重新打开终端。
+
+### 方式二：手动安装
+
+1. **安装依赖**：
+   ```bash
+   sudo apt update && sudo apt install trash-cli
+   ```
+
+2. **编译库文件**：
+   ```bash
+   make gcc-v2
+   # 或手动执行：
+   # gcc -fPIC -shared -o libtrash_intercept_v2.so trash_intercept_v2.c -ldl
+   ```
+
+3. **部署库文件**：
+   ```bash
+   mkdir -p ~/.local/lib/zco
+   cp libtrash_intercept_v2.so ~/.local/lib/zco/
+   ```
+
+4. **配置环境变量**：
+
+   在 `~/.zshrc` 或 `~/.bashrc` 中添加：
+   ```bash
+   export LD_PRELOAD=~/.local/lib/zco/libtrash_intercept_v2.so
+   ```
+
+5. **使配置生效**：
+   ```bash
+   source ~/.zshrc  # 或 source ~/.bashrc
+   ```
+
+### VS Code Remote SSH 配置
+
+如需在 VS Code Remote SSH 环境中使用，需在 VS Code 的 `settings.json` 中添加：
+
+```json
+{
+  "terminal.integrated.env.linux": {
+    "LD_PRELOAD": "/home/你的用户名/.local/lib/zco/libtrash_intercept_v2.so"
+  }
+}
+```
+
+配置后通过 `Remote-SSH: Kill VS Code Server on Host...` 重启 VS Code 服务器。
+
+---
+
+## 🔧 验证安装
+
+安装完成后，可以通过以下方式验证：
+
+```bash
+# 1. 检查环境变量
+echo $LD_PRELOAD
+
+# 2. 测试删除功能
+touch test_file.txt
+rm test_file.txt
+
+# 3. 查看回收站
+trash-list
+```
+
+如果 `test_file.txt` 出现在回收站列表中，说明安装成功。
+
+---
+
+## 📝 日志说明
+
+当 `trash-put` 执行失败时，系统会自动回滚到原始 `rm` 命令，并记录日志到：
+- 默认路径：`~/.zco-trash-log`
+- 自定义路径：通过环境变量 `ZCO_TRASH_LOG` 指定
+
+日志格式：
+```
+[2026-03-05 19:00:00] PWD: /home/user/project , DEST: /home/user/file.txt , RET: 1
+```
+
+---
+
+### 5. 部署路径（旧版说明）
 
 1. **安装依赖**：
    - `sudo apt install trash-cli`

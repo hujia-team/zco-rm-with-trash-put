@@ -67,7 +67,10 @@ int do_trash(const char *pathname) {
 int unlink(const char *pathname) {
     int (*original_unlink)(const char *) = dlsym(RTLD_NEXT, "unlink");
     if (should_intercept(pathname)) {
-        return do_trash(pathname);
+        int ret = do_trash(pathname);
+        if (ret == 0) {
+            return ret;
+        }
     }
     return original_unlink(pathname);
 }
@@ -80,7 +83,10 @@ int unlinkat(int dirfd, const char *pathname, int flags) {
     // 但 realpath(pathname, NULL) 会自动处理相对于当前工作目录的路径
     // 如果是基于 dirfd 的复杂相对路径，realpath 可能会失败，此时我们保守起见不劫持
     if (should_intercept(pathname)) {
-        return do_trash(pathname);
+        int ret = do_trash(pathname);
+        if (ret == 0) {
+            return ret;
+        }
     }
 
     return original_unlinkat(dirfd, pathname, flags);

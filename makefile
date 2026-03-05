@@ -17,6 +17,17 @@ check:
 		echo "[checked] trash-cli version: $$(trash-put --version)"; \
 	fi
 
+install: check gcc-v2
+	mkdir -p ~/.local/lib/zco
+	@if [ -f ~/.local/lib/zco/libtrash_intercept_v2.so ]; then \
+		echo "[checked] libtrash_intercept_v2.so already installed, 请手动重置, 如下:"; \
+		echo ""; \
+		echo "unset LD_PRELOAD"; \
+		echo "cp libtrash_intercept_v2.so ~/.local/lib/zco/libtrash_intercept_v2.so"; \
+	else \
+		cp libtrash_intercept_v2.so ~/.local/lib/zco/libtrash_intercept_v2.so; \
+	fi
+	@echo "如需立即生效，请执行 export LD_PRELOAD=$$HOME/.local/lib/zco/libtrash_intercept_v2.so "
 
 install-zshrc: check
 	gcc -fPIC -shared -o libtrash_intercept_v2.so trash_intercept_v2.c -ldl

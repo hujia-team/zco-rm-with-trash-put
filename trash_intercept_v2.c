@@ -14,33 +14,73 @@ const char *PROTECTED_PREFIX = "/home/";
 
 const char *EXCLUDE_PATTERNS[] = {
     "/.",
-    "/.git/",
     "/logs/",
     "/tmp/",
     "/lib/",
     "/bin/",
+    "/build/",
+    "/__pycache__/",
     NULL
 };
 
-// 获取日志文件路径
-const char* get_log_path(void) {
-    const char* log_path = getenv("ZCO_TRASH_LOG");
-    if (log_path && strlen(log_path) > 0) {
-        return log_path;
+// 模拟 Python 的 os.path.normpath：处理 . 和 .. 但不解析符号链接
+void normalize_path(char *path) {
+    char *src = path, *dst = path;
+    char *stack[PATH_MAX / 2];
+    int top = 0;
+
+    // 1. 分解路径
+    char *token = strtok(src, "/");
+    int is_absolute = (path[0] == '/');
+
+    while (token != NULL) {
+        if (strcmp(token, ".") == 0) {
+            // 忽略 .
+        } else if (strcmp(token, "..") == 0) {
+            // 弹出上一级
+            if (top > 0) top--;
+        } else {
+            stack[top++] = token;
+        }
+        token = strtok(NULL, "/");
     }
-    static char default_path[PATH_MAX];
-    const char* home = getenv("HOME");
-    if (home) {
-        snprintf(default_path, sizeof(default_path), "%s/.zco-trash-log", home);
+
+    // 2. 重组路径
+    if (is_absolute) *dst++ = '/';
+    for (int i = 0; i < top; i++) {
+        strcpy(dst, stack[i]);
+        dst += strlen(stack[i]);
+        if (i < top - 1) *dst++ = '/';
+    }
+    *dst = '\0';
+    if (is_absolute && top == 0) strcpy(path, "/");
+}
+
+// 模拟 Python 的 os.path.abspath
+char *get_abspath(const char *pathname) {
+    if (!pathname) return NULL;
+
+    char *full_path = malloc(PATH_MAX);
+    if (pathname[0] == '/') {
+        strncpy(full_path, pathname, PATH_MAX);
     } else {
-        snprintf(default_path, sizeof(default_path), "/tmp/.zco-trash-log");
+        char cwd[PATH_MAX];
+        if (getcwd(cwd, sizeof(cwd))) {
+            snprintf(full_path, PATH_MAX, "%s/%s", cwd, pathname);
+        } else {
+            free(full_path);
+            return NULL;
+        }
     }
-    return default_path;
+    
+    normalize_path(full_path);
+    return full_path;
 }
 
 // 记录日志
 void log_trash_failure(const char* pathname, int ret) {
-    const char* log_path = get_log_path();
+    // const char* log_path = get_log_path();
+    const char* log_path = "/tmp/.zco-trash-log";
     FILE* fp = fopen(log_path, "a");
     if (!fp) return;
 
@@ -64,9 +104,10 @@ int should_intercept(const char *pathname) {
     if (getuid() < PROTECTED_UID_GE) return 0;
 
     // 2. 将路径转换为绝对路径
-    char *abs_path = realpath(pathname, NULL);
+    // char *abs_path = realpath(pathname, NULL);
+    char *abs_path = get_abspath(pathname);
     if (!abs_path) {
-        // 如果 realpath 失败（文件可能已经被删或权限不足），不劫持，走原程序逻辑
+        // 如果 abspath失败（文件可能已经被删或权限不足），不劫持，走原程序逻辑
         return 0;
     }
 
@@ -85,7 +126,7 @@ int should_intercept(const char *pathname) {
         }
     }
 
-    // 记得释放 realpath 分配的内存！
+    // 记得释放 abspath分配的内存！
     free(abs_path);
     return intercept;
 }
@@ -118,7 +159,7 @@ int unlinkat(int dirfd, const char *pathname, int flags) {
 
     // unlinkat 的特殊性在于 pathname 可能是相对于 dirfd 的
     // 但 realpath(pathname, NULL) 会自动处理相对于当前工作目录的路径
-    // 如果是基于 dirfd 的复杂相对路径，realpath 可能会失败，此时我们保守起见不劫持
+    // 如果是基于 dirfd 的复杂相对路径，abspath可能会失败，此时我们保守起见不劫持
     if (should_intercept(pathname)) {
         int ret = do_trash(pathname);
         if (ret == 0) {

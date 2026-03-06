@@ -25,37 +25,39 @@ const char *EXCLUDE_PATTERNS[] = {
 
 // 模拟 Python 的 os.path.normpath：处理 . 和 .. 但不解析符号链接
 void normalize_path(char *path) {
-    char *src = path, *dst = path;
+    if (!path || *path == '\0') return;
+
     char *stack[PATH_MAX / 2];
     int top = 0;
-
-    // 1. 分解路径
-    char *token = strtok(src, "/");
-    int is_absolute = (path[0] == '/');
+    char *saveptr;
+    char *dup = strdup(path); // 备份原串，不污染 strtok_r
+    char *token = strtok_r(dup, "/", &saveptr);
 
     while (token != NULL) {
-        if (strcmp(token, ".") == 0) {
-            // 忽略 .
-        } else if (strcmp(token, "..") == 0) {
-            // 弹出上一级
+        if (strcmp(token, "..") == 0) {
             if (top > 0) top--;
-        } else {
+        } else if (strcmp(token, ".") != 0) {
             stack[top++] = token;
         }
-        token = strtok(NULL, "/");
+        token = strtok_r(NULL, "/", &saveptr);
     }
 
-    // 2. 重组路径
-    if (is_absolute) *dst++ = '/';
+    // 重组
+    char *dst = path;
+    if (path[0] == '/') *dst++ = '/';
     for (int i = 0; i < top; i++) {
-        strcpy(dst, stack[i]);
-        dst += strlen(stack[i]);
+        size_t len = strlen(stack[i]);
+        memcpy(dst, stack[i], len);
+        dst += len;
         if (i < top - 1) *dst++ = '/';
     }
     *dst = '\0';
-    if (is_absolute && top == 0) strcpy(path, "/");
+    
+    // 处理空路径情况
+    if (path[0] == '/' && top == 0) strcpy(path, "/");
+    
+    free(dup);
 }
-
 // 模拟 Python 的 os.path.abspath
 char *get_abspath(const char *pathname) {
     if (!pathname) return NULL;
